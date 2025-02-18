@@ -1,6 +1,12 @@
 import { ClientDuplexStream } from '@grpc/grpc-js';
 import { PresenceData } from 'baileys';
-import { StreamingPictureRequest, StreamingRequest, StreamingResponse, StreamTypingRequest } from '../generated/wa_pb';
+import {
+    StreamingOnlineRequest,
+    StreamingPictureRequest,
+    StreamingRequest,
+    StreamingResponse,
+    StreamTypingRequest,
+} from '../generated/wa_pb';
 import { StreamingService } from '../service/streaming-service';
 
 export class StreamingHandler {
@@ -55,12 +61,26 @@ export class StreamingHandler {
         const presenceData = presences[id];
 
         if ('lastSeen' in presenceData) {
-            console.log('online status', presences);
+            this.handleOnlineStatus(id, presenceData);
             return;
         }
 
         // Typing status
         this.handleTypingStatus(id, presenceData);
+    }
+
+    private async handleOnlineStatus(jid: string, presence: PresenceData) {
+        try {
+            const req = new StreamingRequest();
+            const onlineReq = new StreamingOnlineRequest();
+            onlineReq.setJid(jid);
+            onlineReq.setOnline(presence.lastKnownPresence == 'available');
+            req.setStreamingonline(onlineReq);
+            this.stream?.write(req);
+            console.log('✅ sent online status: ', presence.lastKnownPresence);
+        } catch (err) {
+            console.log('failed to send online status: ', err);
+        }
     }
 
     private async handleTypingStatus(jid: string, presence: PresenceData) {
