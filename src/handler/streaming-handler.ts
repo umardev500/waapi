@@ -1,26 +1,42 @@
-import { getGrpcClient } from '../config/grpc';
-import { StreamingResponse } from '../generated/wa_pb';
+import { ClientDuplexStream } from '@grpc/grpc-js';
+import { StreamingPictureRequest, StreamingRequest, StreamingResponse } from '../generated/wa_pb';
 import { StreamingService } from '../service/streaming-service';
 
-export const streaming = () => {
-    const stream = getGrpcClient().streaming();
-    const streamingService = new StreamingService(stream);
+export class StreamingHandler {
+    private stream: ClientDuplexStream<StreamingRequest, StreamingResponse> | null = null;
+    private service: StreamingService | null = null;
 
-    stream.on('data', (res: StreamingResponse) => {
-        switch (res.getMessageCase()) {
+    constructor(stream: ClientDuplexStream<StreamingRequest, StreamingResponse>) {
+        this.stream = stream;
+        this.service = new StreamingService();
+    }
+
+    public handleData(data: StreamingResponse) {
+        switch (data.getMessageCase()) {
             case StreamingResponse.MessageCase.STREAMINGPICTURE:
-                streamingService.getPicture(res);
+                this.getPicture(data);
                 break;
             default:
                 console.log('Unknown message type');
         }
-    });
+    }
 
-    stream.on('error', err => {
-        console.log('streaming failed', err);
-    });
+    private async getPicture(data: StreamingResponse) {
+        const req = new StreamingRequest();
+        const picReq = new StreamingPictureRequest();
+        let picUrl = '';
 
-    stream.on('end', () => {
-        console.log('streaming ended');
-    });
-};
+        try {
+            const url = await this.service?.getPicture(data);
+            if (!url) throw new Error('Profile picture url not found');
+            picUrl = url;
+        } catch (err) {
+            console.log('failed to get picture: ', err);
+        } finally {
+            picReq.setUrl(picUrl);
+            req.setStreamingpicture(picReq);
+            this.stream?.write(req);
+            console.log('✅ sent picture: ', picUrl);
+        }
+    }
+}
