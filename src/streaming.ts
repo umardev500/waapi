@@ -1,10 +1,9 @@
-import { getGrpcClient } from './config/grpc';
 import { StreamingResponse } from './generated/wa_pb';
-import { StreamingHandler } from './handler/streaming-handler';
+import { getStream, getStreamingHandler } from './instance';
 
 export const streaming = () => {
-    const stream = getGrpcClient().streaming();
-    const handler = new StreamingHandler(stream);
+    const stream = getStream();
+    const handler = getStreamingHandler();
 
     stream.on('data', (res: StreamingResponse) => {
         handler.handleData(res);

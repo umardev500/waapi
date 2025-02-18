@@ -1,5 +1,6 @@
 import { ClientDuplexStream } from '@grpc/grpc-js';
-import { StreamingPictureRequest, StreamingRequest, StreamingResponse } from '../generated/wa_pb';
+import { PresenceData } from 'baileys';
+import { StreamingPictureRequest, StreamingRequest, StreamingResponse, StreamTypingRequest } from '../generated/wa_pb';
 import { StreamingService } from '../service/streaming-service';
 
 export class StreamingHandler {
@@ -37,6 +38,43 @@ export class StreamingHandler {
             req.setStreamingpicture(picReq);
             this.stream?.write(req);
             console.log('✅ sent picture: ', picUrl);
+        }
+    }
+
+    /**
+     * Handles presence updates from Baileys.
+     * @param update The presence update event.
+     */
+    public async handlePresense(update: {
+        id: string;
+        presences: {
+            [participant: string]: PresenceData;
+        };
+    }) {
+        const { id, presences } = update;
+        const presenceData = presences[id];
+
+        if ('lastSeen' in presenceData) {
+            console.log('online status', presences);
+            return;
+        }
+
+        // Typing status
+        this.handleTypingStatus(id, presenceData);
+    }
+
+    private async handleTypingStatus(jid: string, presence: PresenceData) {
+        try {
+            const req = new StreamingRequest();
+            const typingReq = new StreamTypingRequest();
+
+            typingReq.setJid(jid);
+            typingReq.setTyping(presence.lastKnownPresence == 'composing');
+
+            req.setStreamtyping(typingReq);
+            this.stream?.write(req);
+        } catch (err) {
+            console.log('failed to send typing status: ', err);
         }
     }
 }
