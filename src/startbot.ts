@@ -11,6 +11,8 @@ export const startBot = async (reconnect: boolean = false) => {
     const sock = makeWASocket({
         auth: state,
         printQRInTerminal: true,
+        connectTimeoutMs: 30 * 1000,
+        keepAliveIntervalMs: 60 * 1000,
     });
 
     setSocket(sock);
